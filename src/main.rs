@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders};
+use tui::widgets::{Block, BorderType, Borders, List, ListItem};
 use tui::Terminal;
 
 enum Event<I> {
@@ -64,23 +64,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .split(size);
 
-            let backlog = Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title(" Backlog ")
-                .border_type(BorderType::Double);
+            // For testing
+            let backlog_items = [ListItem::new("Finish styling"), ListItem::new("Eat"), ListItem::new("Go to bed")];
+            let in_progress_items = [ListItem::new("Implement logic")];
+            let done_items = [ListItem::new("Get basic code running")];
+            // --------
 
-            let inprogress = Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title(" In Progress ")
-                .border_type(BorderType::Double);
+            let backlog = List::new(backlog_items)
+                .block(Block::default().title(" Backlog ").borders(Borders::ALL).border_type(BorderType::Double))
+                .highlight_style(Style::default())
+                .highlight_symbol(">>")
+                .style(Style::default().fg(Color::White));
 
-            let done = Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title(" Done ")
-                .border_type(BorderType::Double);
+            let inprogress = List::new(in_progress_items)
+                .block(Block::default().title(" In Progress ").borders(Borders::ALL).border_type(BorderType::Double))
+                .highlight_style(Style::default())
+                .highlight_symbol(">>")
+                .style(Style::default().fg(Color::White));
+
+            let done = List::new(done_items)
+                .block(Block::default().title(" Done ").borders(Borders::ALL).border_type(BorderType::Double))
+                .highlight_style(Style::default())
+                .highlight_symbol(">>")
+                .style(Style::default().fg(Color::White));
 
             canvas.render_widget(backlog, chunks[0]);
             canvas.render_widget(inprogress, chunks[1]);
