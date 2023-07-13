@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let size = canvas.size();
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .margin(2)
+                .margin(1)
                 .constraints(
                     [
                         Constraint::Percentage(33),
@@ -67,20 +67,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let backlog = Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title("Backlog")
-                .border_type(BorderType::Plain);
+                .title(" Backlog ")
+                .border_type(BorderType::Double);
 
             let inprogress = Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title("In Progress")
-                .border_type(BorderType::Plain);
+                .title(" In Progress ")
+                .border_type(BorderType::Double);
 
             let done = Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title("Done")
-                .border_type(BorderType::Plain);
+                .title(" Done ")
+                .border_type(BorderType::Double);
 
             canvas.render_widget(backlog, chunks[0]);
             canvas.render_widget(inprogress, chunks[1]);
