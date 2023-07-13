@@ -1,5 +1,5 @@
-use crossterm::event::{self, Event as CEvent};
-use crossterm::terminal::enable_raw_mode;
+use crossterm::event::{self, Event as CEvent, KeyCode};
+use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
@@ -17,7 +17,7 @@ enum Event<I> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode().expect("Terminal can run in raw mode.");
-    let (tx, _rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(200);
 
     // Start a thread to update the UI every 200ms
@@ -86,5 +86,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             canvas.render_widget(inprogress, chunks[1]);
             canvas.render_widget(done, chunks[2]);
         })?;
+
+        // Listen for user input
+        match rx.recv()? {
+            Event::Input(event) => match event.code {
+                KeyCode::Char('q') => {
+                    // On quit, disable the terminal and give back control.
+                    disable_raw_mode()?;
+                    terminal.show_cursor()?;
+                    break;
+                },
+                _ => {}
+                
+            }
+            Event::Tick => {}
+        }
     }
+    Ok(())
 }
