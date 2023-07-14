@@ -1,5 +1,6 @@
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use std::cmp::{max, min};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
@@ -14,7 +15,7 @@ enum Event<I> {
     Input(I),
     Tick,
 }
-
+#[derive(Clone, Copy)]
 enum ActiveSection {
     Backlog,
     InProgress,
@@ -82,9 +83,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ActiveSection::InProgress,
         ActiveSection::Done,
     ];
-    let mut colptr: i32 = 0;
+    let mut colptr: usize = 0;
 
     loop {
+        // Scroll to current column
+        app.active_selection = columns[colptr];
+        
         terminal.draw(|canvas| {
             let size = canvas.size();
             let chunks = Layout::default()
@@ -169,16 +173,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.show_cursor()?;
                         return Ok(());
                     }
-                    KeyCode::Char('b') => app.active_selection = ActiveSection::Backlog,
-                    KeyCode::Char('p') => app.active_selection = ActiveSection::InProgress,
-                    KeyCode::Char('d') => app.active_selection = ActiveSection::Done,
+
                     KeyCode::Left => {
-                        colptr = colptr - 1;
-                        println!("{}", colptr);
+                        if colptr != 0 { colptr -= 1};
                     }
                     KeyCode::Right => {
-                        colptr = colptr + 1;
-                        println!("{}", colptr);
+                        if colptr != columns.len() - 1 {colptr += 1};
                     }
                     KeyCode::Char('i') => app.app_state = AppState::Edit,
                     _ => {}
