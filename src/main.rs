@@ -21,6 +21,25 @@ enum ActiveSection {
     Done,
 }
 
+enum AppState {
+    Manage,
+    Edit,
+}
+
+struct App {
+    app_state: AppState,
+    active_selection: ActiveSection,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        App {
+            app_state: AppState::Manage,
+            active_selection: ActiveSection::Backlog
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode().expect("Terminal can run in raw mode.");
     let (tx, rx) = mpsc::channel();
@@ -53,7 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
-    let mut active_section = ActiveSection::Backlog;
+
+    // Default
+    let mut app = App::default();
 
     loop {
         terminal.draw(|canvas| {
@@ -86,11 +107,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Block::default()
                         .title(" Backlog ")
                         .borders(Borders::ALL)
-                        .border_type(
-                            match active_section {
-                                ActiveSection::Backlog => BorderType::Double,
-                                _ => BorderType::Plain
-                            }),
+                        .border_type(match app.active_selection {
+                            ActiveSection::Backlog => BorderType::Double,
+                            _ => BorderType::Plain,
+                        }),
                 )
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
@@ -101,11 +121,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Block::default()
                         .title(" In Progress ")
                         .borders(Borders::ALL)
-                        .border_type(
-                            match active_section {
-                                ActiveSection::InProgress => BorderType::Double,
-                                _ => BorderType::Plain
-                            }),
+                        .border_type(match app.active_selection {
+                            ActiveSection::InProgress => BorderType::Double,
+                            _ => BorderType::Plain,
+                        }),
                 )
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
@@ -116,11 +135,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Block::default()
                         .title(" Done ")
                         .borders(Borders::ALL)
-                        .border_type(
-                            match active_section {
-                                ActiveSection::Done => BorderType::Double,
-                                _ => BorderType::Plain
-                            }),
+                        .border_type(match app.active_selection {
+                            ActiveSection::Done => BorderType::Double,
+                            _ => BorderType::Plain,
+                        }),
                 )
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
@@ -132,21 +150,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
 
         // Listen for user input
-        match rx.recv()? {
-            Event::Input(event) => match event.code {
-                KeyCode::Char('q') => {
-                    // On quit, disable the terminal and give back control.
-                    disable_raw_mode()?;
-                    terminal.show_cursor()?;
-                    break;
-                }
-                KeyCode::Char('b') => active_section = ActiveSection::Backlog,
-                KeyCode::Char('p') => active_section = ActiveSection::InProgress,
-                KeyCode::Char('d') => active_section = ActiveSection::Done,
-                _ => {}
+        match app.app_state {
+
+            // Management mode
+            AppState::Manage => match rx.recv()? {
+
+                    Event::Input(event) => match event.code {
+                        KeyCode::Char('q') => {
+                            // On quit, disable the terminal and give back control.
+                            disable_raw_mode()?;
+                            terminal.clear()?;
+                            terminal.show_cursor()?;
+                            return Ok(());
+                        },
+                        KeyCode::Char('b') => app.active_selection = ActiveSection::Backlog,
+                        KeyCode::Char('p') => app.active_selection = ActiveSection::InProgress,
+                        KeyCode::Char('d') => app.active_selection = ActiveSection::Done,
+                        KeyCode::Char('i') => app.app_state = AppState::Edit,
+                        _ => {}
+                    },
+
+                    Event::Tick => {}
+            }
+
+            // Edit / insert mode
+            AppState::Edit => match rx.recv()? {
+                Event::Input(event) => match event.code {
+                    KeyCode::Char('q') => {
+                        // On quit, disable the terminal and give back control.
+                        disable_raw_mode()?;
+                        terminal.clear()?;
+                        terminal.show_cursor()?;
+                        return Ok(());
+                    },
+                    KeyCode::Esc => {
+                        app.app_state = AppState::Manage;
+                    }
+                    _ => {}
+                },
+
+                Event::Tick => {},
             },
-            Event::Tick => {}
-        }
+        };
+
     }
-    Ok(())
 }
