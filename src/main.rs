@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event as CEvent, KeyCode};
+use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::io;
 use std::sync::mpsc;
@@ -35,7 +35,7 @@ impl Default for App {
     fn default() -> Self {
         App {
             app_state: AppState::Manage,
-            active_selection: ActiveSection::Backlog
+            active_selection: ActiveSection::Backlog,
         }
     }
 }
@@ -55,8 +55,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if event::poll(timeout).expect("Thread polling works.") {
                 if let CEvent::Key(key) = event::read().expect("Thread can read user events.") {
-                    tx.send(Event::Input(key))
-                        .expect("Thread can transmit events.");
+                    if key.kind == KeyEventKind::Press {
+                        tx.send(Event::Input(key))
+                            .expect("Thread can transmit events.");
+                    }
                 }
             }
 
@@ -75,6 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Default
     let mut app = App::default();
+    let columns = [
+        ActiveSection::Backlog,
+        ActiveSection::InProgress,
+        ActiveSection::Done,
+    ];
+    let mut colptr: i32 = 0;
 
     loop {
         terminal.draw(|canvas| {
@@ -151,27 +159,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Listen for user input
         match app.app_state {
-
             // Management mode
             AppState::Manage => match rx.recv()? {
+                Event::Input(event) => match event.code {
+                    KeyCode::Char('q') => {
+                        // On quit, disable the terminal and give back control.
+                        disable_raw_mode()?;
+                        terminal.clear()?;
+                        terminal.show_cursor()?;
+                        return Ok(());
+                    }
+                    KeyCode::Char('b') => app.active_selection = ActiveSection::Backlog,
+                    KeyCode::Char('p') => app.active_selection = ActiveSection::InProgress,
+                    KeyCode::Char('d') => app.active_selection = ActiveSection::Done,
+                    KeyCode::Left => {
+                        colptr = colptr - 1;
+                        println!("{}", colptr);
+                    }
+                    KeyCode::Right => {
+                        colptr = colptr + 1;
+                        println!("{}", colptr);
+                    }
+                    KeyCode::Char('i') => app.app_state = AppState::Edit,
+                    _ => {}
+                },
 
-                    Event::Input(event) => match event.code {
-                        KeyCode::Char('q') => {
-                            // On quit, disable the terminal and give back control.
-                            disable_raw_mode()?;
-                            terminal.clear()?;
-                            terminal.show_cursor()?;
-                            return Ok(());
-                        },
-                        KeyCode::Char('b') => app.active_selection = ActiveSection::Backlog,
-                        KeyCode::Char('p') => app.active_selection = ActiveSection::InProgress,
-                        KeyCode::Char('d') => app.active_selection = ActiveSection::Done,
-                        KeyCode::Char('i') => app.app_state = AppState::Edit,
-                        _ => {}
-                    },
-
-                    Event::Tick => {}
-            }
+                Event::Tick => {}
+            },
 
             // Edit / insert mode
             AppState::Edit => match rx.recv()? {
@@ -182,16 +196,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.clear()?;
                         terminal.show_cursor()?;
                         return Ok(());
-                    },
+                    }
                     KeyCode::Esc => {
                         app.app_state = AppState::Manage;
                     }
                     _ => {}
                 },
 
-                Event::Tick => {},
+                Event::Tick => {}
             },
         };
-
     }
 }
