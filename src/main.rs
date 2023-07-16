@@ -1,6 +1,5 @@
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use std::cmp::{max, min};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
@@ -8,7 +7,7 @@ use std::time::{Duration, Instant};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, List, ListItem};
+use tui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph};
 use tui::Terminal;
 
 enum Event<I> {
@@ -88,21 +87,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // Scroll to current column
         app.active_selection = columns[colptr];
-        
+
         terminal.draw(|canvas| {
             let size = canvas.size();
+
             let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(0)
+                .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref()).vertical_margin(0)
+                .split(size);
+
+            let body_chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .margin(1)
+                .margin(0)
                 .constraints(
                     [
-                        Constraint::Percentage(33),
-                        Constraint::Percentage(33),
-                        Constraint::Percentage(33),
+                        Constraint::Ratio(1, 3),
+                        Constraint::Ratio(1, 3),
+                        Constraint::Ratio(1, 3),
                     ]
                     .as_ref(),
                 )
-                .split(size);
+                .vertical_margin(0)
+                .split(chunks[0]);
 
             // For testing
             let backlog_items = [
@@ -156,9 +163,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            canvas.render_widget(backlog, chunks[0]);
-            canvas.render_widget(inprogress, chunks[1]);
-            canvas.render_widget(done, chunks[2]);
+            let textbox = Paragraph::new("Text here").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Double),
+            );
+
+            canvas.render_widget(backlog, body_chunks[0]);
+            canvas.render_widget(inprogress, body_chunks[1]);
+            canvas.render_widget(done, body_chunks[2]);
+            canvas.render_widget(textbox, chunks[1]);
         })?;
 
         // Listen for user input
@@ -175,10 +189,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     KeyCode::Left => {
-                        if colptr != 0 { colptr -= 1};
+                        if colptr != 0 {
+                            colptr -= 1
+                        };
                     }
                     KeyCode::Right => {
-                        if colptr != columns.len() - 1 {colptr += 1};
+                        if colptr != columns.len() - 1 {
+                            colptr += 1
+                        };
                     }
                     KeyCode::Char('i') => app.app_state = AppState::Edit,
                     _ => {}
