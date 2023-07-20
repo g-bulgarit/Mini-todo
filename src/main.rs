@@ -175,11 +175,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            let textbox = Paragraph::new("Text here").block(
+            let textbox = Paragraph::new(app.current_message.as_ref()).block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_type(BorderType::Double),
-            );
+                );
+                
+            match app.app_state {
+                    AppState::Edit => {
+                    canvas.set_cursor(
+                        // Put cursor past the end of the input text
+                        chunks[1].x + app.current_message.len() as u16 + 1,
+                        // Move one line down, from the border to the input line
+                        chunks[1].y + 1,
+                    )
+                },
+                
+                AppState::Manage => {}
+            }
 
             canvas.render_widget(backlog, body_chunks[0]);
             canvas.render_widget(inprogress, body_chunks[1]);
@@ -210,7 +223,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             colptr += 1
                         };
                     }
-                    KeyCode::Char('i') => app.app_state = AppState::Edit,
+                    KeyCode::Char('i') => {
+                        app.app_state = AppState::Edit;
+                    },
                     _ => {}
                 },
 
