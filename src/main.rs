@@ -1,9 +1,12 @@
+mod tasks;
+
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use tasks::{Task, TaskStatus};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
@@ -84,9 +87,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     let mut colptr: usize = 0;
 
+    // For testing
+    let mut tasks: Vec<Task> = Vec::new();
+    let test_task = Task::create_new_task("Sample task".to_string(), TaskStatus::Backlog);
+    tasks.push(test_task);
+
+    let mut backlog_items: Vec<ListItem> = Vec::new();
+    let mut in_progress_items: Vec<ListItem> = Vec::new();
+    let mut done_items: Vec<ListItem> = Vec::new();
+
+    
+    update(
+        &tasks,
+        &mut backlog_items,
+        &mut in_progress_items,
+        &mut done_items,
+    );
+
+
     loop {
         // Scroll to current column
         app.active_selection = columns[colptr];
+
+
 
         terminal.draw(|canvas| {
             let size = canvas.size();
@@ -94,7 +117,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(0)
-                .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref()).vertical_margin(0)
+                .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
+                .vertical_margin(0)
                 .split(size);
 
             let body_chunks = Layout::default()
@@ -111,17 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .vertical_margin(0)
                 .split(chunks[0]);
 
-            // For testing
-            let backlog_items = [
-                ListItem::new("Finish styling"),
-                ListItem::new("Eat"),
-                ListItem::new("Go to bed"),
-            ];
-            let in_progress_items = [ListItem::new("Implement logic")];
-            let done_items = [ListItem::new("Get basic code running")];
-            // --------
-
-            let backlog = List::new(backlog_items)
+            let backlog = List::new(backlog_items.as_ref())
                 .block(
                     Block::default()
                         .title(" Backlog ")
@@ -135,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            let inprogress = List::new(in_progress_items)
+            let inprogress = List::new(in_progress_items.as_ref())
                 .block(
                     Block::default()
                         .title(" In Progress ")
@@ -149,7 +163,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            let done = List::new(done_items)
+            let done = List::new(done_items.as_ref())
                 .block(
                     Block::default()
                         .title(" Done ")
@@ -218,11 +232,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Esc => {
                         app.app_state = AppState::Manage;
                     }
+                    KeyCode::Enter => {
+                        todo!()
+                    }
                     _ => {}
                 },
 
                 Event::Tick => {}
             },
         };
+    }
+}
+
+fn update(
+    tasks: &Vec<Task>,
+    backlog_items: &mut Vec<ListItem>,
+    in_progress_items: &mut Vec<ListItem>,
+    done_items: &mut Vec<ListItem>,
+) {
+    for task in tasks {
+        match task.get_status() {
+            TaskStatus::Backlog => backlog_items.push(task.to_list_item()),
+            TaskStatus::InProgress => in_progress_items.push(task.to_list_item()),
+            TaskStatus::Done => done_items.push(task.to_list_item()),
+        }
     }
 }
