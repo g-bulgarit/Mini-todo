@@ -1,19 +1,30 @@
-use tui::widgets::Block;
+use tui::widgets::ListItem;
 
-enum TaskStatus {
+#[derive(Clone, Copy)]
+pub enum TaskStatus {
     Backlog,
     InProgress,
     Done,
 }
 
-struct Task {
+#[derive(Clone)]
+pub struct Task {
     status: TaskStatus,
     text: String,
 }
 
-impl From<Task> for Block {
-    fn from(input: Task) -> Block{
-        !todo()
+
+impl Task {
+    pub fn create_new_task(text: String, status: TaskStatus) -> Task{
+        Task {status: status, text: text}
     }
 
-}
+    pub fn to_list_item(&self) -> ListItem<'static> {
+        ListItem::new(self.text.clone())
+    }
+
+    pub fn get_status(&self) -> TaskStatus {
+        self.status
+    }
+} 
+
