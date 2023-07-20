@@ -32,6 +32,7 @@ enum AppState {
 struct App {
     app_state: AppState,
     active_selection: ActiveSection,
+    current_message: String,
 }
 
 impl Default for App {
@@ -39,6 +40,7 @@ impl Default for App {
         App {
             app_state: AppState::Manage,
             active_selection: ActiveSection::Backlog,
+            current_message: String::new(),
         }
     }
 }
@@ -96,7 +98,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut in_progress_items: Vec<ListItem> = Vec::new();
     let mut done_items: Vec<ListItem> = Vec::new();
 
-    
     update(
         &tasks,
         &mut backlog_items,
@@ -104,12 +105,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut done_items,
     );
 
-
     loop {
         // Scroll to current column
         app.active_selection = columns[colptr];
-
-
 
         terminal.draw(|canvas| {
             let size = canvas.size();
@@ -222,18 +220,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Edit / insert mode
             AppState::Edit => match rx.recv()? {
                 Event::Input(event) => match event.code {
-                    KeyCode::Char('q') => {
-                        // On quit, disable the terminal and give back control.
-                        disable_raw_mode()?;
-                        terminal.clear()?;
-                        terminal.show_cursor()?;
-                        return Ok(());
+                    KeyCode::Char(c) => {
+                        app.current_message.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        app.current_message.pop();
                     }
                     KeyCode::Esc => {
                         app.app_state = AppState::Manage;
                     }
                     KeyCode::Enter => {
-                        todo!()
+                        let msg_text = app.current_message.drain(..).collect();
+                        let new_task: Task = Task::create_new_task(msg_text, TaskStatus::Backlog);
+                        tasks.push(new_task);
+                        update(&tasks, &mut backlog_items, &mut in_progress_items, &mut done_items);
                     }
                     _ => {}
                 },
@@ -250,6 +250,9 @@ fn update(
     in_progress_items: &mut Vec<ListItem>,
     done_items: &mut Vec<ListItem>,
 ) {
+    backlog_items.clear();
+    in_progress_items.clear();
+    done_items.clear();
     for task in tasks {
         match task.get_status() {
             TaskStatus::Backlog => backlog_items.push(task.to_list_item()),
