@@ -89,11 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     let mut colptr: usize = 0;
 
-    // For testing
     let mut tasks: Vec<Task> = Vec::new();
-    let test_task = Task::create_new_task("Sample task".to_string(), TaskStatus::Backlog);
-    tasks.push(test_task);
-
     let mut backlog_items: Vec<ListItem> = Vec::new();
     let mut in_progress_items: Vec<ListItem> = Vec::new();
     let mut done_items: Vec<ListItem> = Vec::new();
