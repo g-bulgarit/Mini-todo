@@ -61,8 +61,6 @@ impl Default for App {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode().expect("Terminal can run in raw mode.");
     let (tx, rx) = mpsc::channel();
-
-    // Start a thread to update the UI every 200ms
     thread::spawn(move || {
         loop {
             if let CEvent::Key(key) = event::read().expect("Thread can read user events.") {
