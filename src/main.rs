@@ -6,17 +6,15 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::io;
 use std::sync::mpsc;
 use std::thread;
-use std::time::{Duration, Instant};
 use tui::backend::CrosstermBackend;
 use tui::layout::Alignment;
 use tui::layout::{Constraint, Direction, Layout};
-use tui::style::{Color, Style};
+use tui::style::{Color, Style, Modifier};
 use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
 use tui::Terminal;
 
 enum Event<I> {
     Input(I),
-    Tick,
 }
 #[derive(Clone, Copy)]
 enum ActiveSection {
@@ -63,28 +61,14 @@ impl Default for App {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode().expect("Terminal can run in raw mode.");
     let (tx, rx) = mpsc::channel();
-    let tick_rate = Duration::from_millis(200);
 
     // Start a thread to update the UI every 200ms
     thread::spawn(move || {
-        let mut last_tick = Instant::now();
         loop {
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
-
-            if event::poll(timeout).expect("Thread polling works.") {
-                if let CEvent::Key(key) = event::read().expect("Thread can read user events.") {
-                    if key.kind == KeyEventKind::Press {
-                        tx.send(Event::Input(key))
-                            .expect("Thread can transmit events.");
-                    }
-                }
-            }
-
-            if last_tick.elapsed() >= tick_rate {
-                if let Ok(_) = tx.send(Event::Tick) {
-                    last_tick = Instant::now();
+            if let CEvent::Key(key) = event::read().expect("Thread can read user events.") {
+                if key.kind == KeyEventKind::Press {
+                    tx.send(Event::Input(key))
+                        .expect("Thread can transmit events.");
                 }
             }
         }
@@ -150,9 +134,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             _ => BorderType::Plain,
                         }),
                 )
-                .highlight_style(Style::default())
-                .highlight_symbol("->")
-                .style(Style::default().fg(Color::White));
+                .highlight_style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+                .highlight_symbol("-> ")
+                .style(match app.active_selection {
+                    ActiveSection::Backlog => Style::default().fg(Color::Cyan),
+                    _ => Style::default()
+                }
+                );
 
             let inprogress_listitems: Vec<ListItem<'_>> = in_progress_items
                 .iter()
@@ -168,9 +156,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             _ => BorderType::Plain,
                         }),
                 )
-                .highlight_style(Style::default())
-                .highlight_symbol("->")
-                .style(Style::default().fg(Color::White));
+                .highlight_style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+                .highlight_symbol("-> ")
+                .style(match app.active_selection {
+                    ActiveSection::InProgress => Style::default().fg(Color::Cyan),
+                    _ => Style::default()
+                }
+                );
 
             let done_listitems: Vec<ListItem<'_>> = done_items
                 .iter()
@@ -184,14 +176,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .border_type(match app.active_selection {
                             ActiveSection::Done => BorderType::Double,
                             _ => BorderType::Plain,
-                        }),
+                        })
                 )
-                .highlight_style(Style::default())
-                .highlight_symbol("->")
-                .style(Style::default().fg(Color::White));
+                .highlight_style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+                .highlight_symbol("-> ")
+                .style(match app.active_selection {
+                    ActiveSection::Done => Style::default().fg(Color::Cyan),
+                    _ => Style::default()
+                }
+                );
 
             let textbox = match app.app_state {
-                AppState::Manage => Paragraph::new("Use arrow keys to move around, <i> to go to edit mode, <del> to delete a task and <q> to quit.")
+                AppState::Manage => Paragraph::new("<i> to go to edit mode, <j, k> to move task, <del> to delete a task and <q> to quit.")
                 .block(Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Plain),)
@@ -280,6 +276,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         app.app_state = AppState::Edit;
                     }
 
+                    KeyCode::Char('k') => {
+                        match app.active_selection {
+                            ActiveSection::Backlog => {
+                                if let Some(selected_idx) = app.backlog_state.selected() {
+                                    if backlog_items.len() != 0 {
+                                        backlog_items[selected_idx].change_status(TaskStatus::InProgress);
+                                        let popped_task = backlog_items.remove(selected_idx);
+                                        in_progress_items.push(popped_task);
+                                        app.inprogress_size += 1;
+                                        app.backlog_size -= 1;
+                                    }
+                                }
+                            },
+                            ActiveSection::InProgress => {
+                                if let Some(selected_idx) = app.inprogress_state.selected() {
+                                    if in_progress_items.len() != 0 {
+                                        in_progress_items[selected_idx].change_status(TaskStatus::Done);
+                                        let popped_task = in_progress_items.remove(selected_idx);
+                                        done_items.push(popped_task);
+                                        app.done_size += 1;
+                                        app.inprogress_size -= 1;
+                                    }
+                                }
+                            },
+                            ActiveSection::Done => {}
+                        }
+                    }
+
+                    KeyCode::Char('j') => {
+                        match app.active_selection {
+                            ActiveSection::Backlog => {},
+                            ActiveSection::InProgress => {
+                                if let Some(selected_idx) = app.inprogress_state.selected() {
+                                    if in_progress_items.len() != 0 {
+                                        in_progress_items[selected_idx].change_status(TaskStatus::Backlog);
+                                        let popped_task = in_progress_items.remove(selected_idx);
+                                        backlog_items.push(popped_task);
+                                        app.backlog_size += 1;
+                                        app.inprogress_size -= 1;
+                                    }
+                                }
+                            },
+                            ActiveSection::Done => {
+                                if let Some(selected_idx) = app.done_state.selected() {
+                                    if done_items.len() != 0 {
+                                        done_items[selected_idx].change_status(TaskStatus::InProgress);
+                                        let popped_task = done_items.remove(selected_idx);
+                                        in_progress_items.push(popped_task);
+                                        app.inprogress_size += 1;
+                                        app.done_size -= 1;
+                                    }
+                                }
+                            },
+                        }
+                    }
+
                     KeyCode::Delete => match app.active_selection {
                         ActiveSection::Backlog => {
                             if let Some(selected_idx) = app.backlog_state.selected() {
@@ -316,9 +368,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     },
                     _ => {}
-                },
-
-                Event::Tick => {}
+                }
             },
 
             // Edit / insert mode
@@ -353,9 +403,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     _ => {}
-                },
+                }
 
-                Event::Tick => {}
             },
         };
     }

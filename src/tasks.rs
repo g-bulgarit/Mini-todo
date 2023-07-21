@@ -18,4 +18,8 @@ impl Task {
             text: text,
         }
     }
+
+    pub fn change_status(&mut self, status: TaskStatus) {
+        self.status = status;
+    }
 }
