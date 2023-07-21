@@ -243,7 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ActiveSection::InProgress => upper_limit = app.inprogress_size,
                             ActiveSection::Done => upper_limit = app.done_size,
                         }
-                        if app.current_selection_idx < upper_limit - 1 {
+                        if upper_limit != 0 && app.current_selection_idx < upper_limit - 1 {
                             app.current_selection_idx += 1;
                         }
                     }
@@ -267,6 +267,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('i') => {
                         app.app_state = AppState::Edit;
                     }
+                    KeyCode::Delete => {
+                        match app.active_selection {
+                            ActiveSection::Backlog => {
+                                if let Some(selected_idx) = app.backlog_state.selected() {
+                                    backlog_items.remove(selected_idx);
+                                    app.backlog_size -= 1;
+                                    if app.current_selection_idx != 0 {
+                                        app.current_selection_idx -= 1;
+                                    }
+                                }
+                            },
+                            ActiveSection::InProgress => todo!(),
+                            ActiveSection::Done => todo!(),
+                        }
+                    }
                     _ => {}
                 },
 
@@ -289,13 +304,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let msg_text = app.current_message.drain(..).collect();
                         match app.active_selection {
                             ActiveSection::Backlog => {
-                                backlog_items.push(Task::create_new_task(msg_text, TaskStatus::Backlog));
+                                backlog_items
+                                    .push(Task::create_new_task(msg_text, TaskStatus::Backlog));
                                 app.backlog_size += 1;
                             }
                             ActiveSection::InProgress => {
-                                in_progress_items.push(Task::create_new_task(msg_text, TaskStatus::InProgress));
+                                in_progress_items
+                                    .push(Task::create_new_task(msg_text, TaskStatus::InProgress));
                                 app.inprogress_size += 1;
-
                             }
                             ActiveSection::Done => {
                                 done_items.push(Task::create_new_task(msg_text, TaskStatus::Done));
