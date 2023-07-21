@@ -10,7 +10,7 @@ use tasks::{Task, TaskStatus};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph};
+use tui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, ListState};
 use tui::Terminal;
 
 enum Event<I> {
@@ -32,7 +32,11 @@ enum AppState {
 struct App {
     app_state: AppState,
     active_selection: ActiveSection,
+    backlog_size: usize,
+    inprogress_size: usize,
+    done_size: usize,
     current_message: String,
+    current_selection_idx: usize,
 }
 
 impl Default for App {
@@ -41,6 +45,10 @@ impl Default for App {
             app_state: AppState::Manage,
             active_selection: ActiveSection::Backlog,
             current_message: String::new(),
+            current_selection_idx: 0,
+            backlog_size: 0,
+            inprogress_size: 0,
+            done_size: 0,
         }
     }
 }
@@ -95,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut done_items: Vec<ListItem> = Vec::new();
 
     update(
+        &mut app,
         &tasks,
         &mut backlog_items,
         &mut in_progress_items,
@@ -142,9 +151,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
-
+            let mut backlog_state = ListState::default();
+            backlog_state.select(Some(app.current_selection_idx));
+            
             let inprogress = List::new(in_progress_items.as_ref())
-                .block(
+            .block(
                     Block::default()
                         .title(" In Progress ")
                         .borders(Borders::ALL)
@@ -152,11 +163,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ActiveSection::InProgress => BorderType::Double,
                             _ => BorderType::Plain,
                         }),
-                )
+                    )
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
-
+            let mut inprogress_state = ListState::default();
+            
             let done = List::new(done_items.as_ref())
                 .block(
                     Block::default()
@@ -170,6 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
+            let mut done_state = ListState::default();
 
             let textbox = Paragraph::new(app.current_message.as_ref()).block(
                 Block::default()
@@ -190,9 +203,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AppState::Manage => {}
             }
 
-            canvas.render_widget(backlog, body_chunks[0]);
-            canvas.render_widget(inprogress, body_chunks[1]);
-            canvas.render_widget(done, body_chunks[2]);
+            canvas.render_stateful_widget(backlog, body_chunks[0], &mut backlog_state);
+            canvas.render_stateful_widget(inprogress, body_chunks[1], &mut inprogress_state);
+            canvas.render_stateful_widget(done, body_chunks[2], &mut done_state);
             canvas.render_widget(textbox, chunks[1]);
         })?;
 
@@ -208,15 +221,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.show_cursor()?;
                         return Ok(());
                     }
-
+                    KeyCode::Down => {
+                        let upper_limit;
+                        match app.active_selection {
+                            ActiveSection::Backlog => upper_limit = app.backlog_size,
+                            ActiveSection::InProgress => upper_limit = app.inprogress_size,
+                            ActiveSection::Done => upper_limit = app.done_size,
+                        }
+                        if app.current_selection_idx < upper_limit - 1 {
+                            app.current_selection_idx += 1;
+                        }
+                    }
+                    KeyCode::Up => {
+                        if app.current_selection_idx != 0 {
+                            app.current_selection_idx -= 1;
+                        }
+                    }
                     KeyCode::Left => {
                         if colptr != 0 {
-                            colptr -= 1
+                            colptr -= 1;
+                            app.current_selection_idx = 0;
                         };
                     }
                     KeyCode::Right => {
                         if colptr != columns.len() - 1 {
-                            colptr += 1
+                            colptr += 1;
+                            app.current_selection_idx = 0;
                         };
                     }
                     KeyCode::Char('i') => {
@@ -244,7 +274,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let msg_text = app.current_message.drain(..).collect();
                         let new_task: Task = Task::create_new_task(msg_text, TaskStatus::Backlog);
                         tasks.push(new_task);
-                        update(&tasks, &mut backlog_items, &mut in_progress_items, &mut done_items);
+                        update(&mut app, &tasks, &mut backlog_items, &mut in_progress_items, &mut done_items);
                     }
                     _ => {}
                 },
@@ -256,19 +286,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn update(
+    app: &mut App,
     tasks: &Vec<Task>,
     backlog_items: &mut Vec<ListItem>,
     in_progress_items: &mut Vec<ListItem>,
     done_items: &mut Vec<ListItem>,
 ) {
     backlog_items.clear();
+    app.backlog_size = 0;
+
     in_progress_items.clear();
+    app.inprogress_size = 0;
+
     done_items.clear();
+    app.done_size = 0;
+
     for task in tasks {
         match task.get_status() {
-            TaskStatus::Backlog => backlog_items.push(task.to_list_item()),
-            TaskStatus::InProgress => in_progress_items.push(task.to_list_item()),
-            TaskStatus::Done => done_items.push(task.to_list_item()),
+            TaskStatus::Backlog => {
+                backlog_items.push(task.to_list_item());
+                app.backlog_size += 1;
+            },
+            TaskStatus::InProgress => {
+                in_progress_items.push(task.to_list_item());
+                app.inprogress_size += 1;
+            }
+            TaskStatus::Done => {
+                done_items.push(task.to_list_item());
+                app.done_size += 1;
+            }
         }
     }
 }
