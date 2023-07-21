@@ -1,4 +1,5 @@
 mod tasks;
+use tasks::{Task, TaskStatus};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -6,7 +7,6 @@ use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tasks::{Task, TaskStatus};
 use tui::backend::CrosstermBackend;
 use tui::layout::Alignment;
 use tui::layout::{Constraint, Direction, Layout};
@@ -151,7 +151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }),
                 )
                 .highlight_style(Style::default())
-                .highlight_symbol(">>")
+                .highlight_symbol("->")
                 .style(Style::default().fg(Color::White));
 
             let inprogress_listitems: Vec<ListItem<'_>> = in_progress_items
@@ -169,7 +169,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }),
                 )
                 .highlight_style(Style::default())
-                .highlight_symbol(">>")
+                .highlight_symbol("->")
                 .style(Style::default().fg(Color::White));
 
             let done_listitems: Vec<ListItem<'_>> = done_items
@@ -187,15 +187,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }),
                 )
                 .highlight_style(Style::default())
-                .highlight_symbol(">>")
+                .highlight_symbol("->")
                 .style(Style::default().fg(Color::White));
 
             let textbox = match app.app_state {
-                AppState::Manage => Paragraph::new("Use arrow keys to move around, <i> to go to edit mode, <del> to delete a task and <q> to quit.").block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Plain),
-                ).alignment(Alignment::Center),
+                AppState::Manage => Paragraph::new("Use arrow keys to move around, <i> to go to edit mode, <del> to delete a task and <q> to quit.")
+                .block(Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),)
+                .alignment(Alignment::Center),
+            
 
                 AppState::Edit => {
                     Paragraph::new(app.current_message.as_ref()).block(
@@ -278,6 +279,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('i') => {
                         app.app_state = AppState::Edit;
                     }
+
                     KeyCode::Delete => match app.active_selection {
                         ActiveSection::Backlog => {
                             if let Some(selected_idx) = app.backlog_state.selected() {
