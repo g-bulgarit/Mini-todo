@@ -212,7 +212,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ActiveSection::InProgress => {
                         app.inprogress_state.select(Some(app.current_selection_idx))
                     }
-                    ActiveSection::Done => app.done_state.select(Some(app.current_selection_idx)),
+                    ActiveSection::Done => {
+                        app.done_state.select(Some(app.current_selection_idx));
+                    }
                 },
             }
 
@@ -286,12 +288,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Enter => {
                         let msg_text = app.current_message.drain(..).collect();
                         match app.active_selection {
-                            ActiveSection::Backlog => backlog_items
-                                .push(Task::create_new_task(msg_text, TaskStatus::Backlog)),
-                            ActiveSection::InProgress => in_progress_items
-                                .push(Task::create_new_task(msg_text, TaskStatus::InProgress)),
+                            ActiveSection::Backlog => {
+                                backlog_items.push(Task::create_new_task(msg_text, TaskStatus::Backlog));
+                                app.backlog_size += 1;
+                            }
+                            ActiveSection::InProgress => {
+                                in_progress_items.push(Task::create_new_task(msg_text, TaskStatus::InProgress));
+                                app.inprogress_size += 1;
+
+                            }
                             ActiveSection::Done => {
-                                done_items.push(Task::create_new_task(msg_text, TaskStatus::Done))
+                                done_items.push(Task::create_new_task(msg_text, TaskStatus::Done));
+                                app.done_size += 1;
                             }
                         }
                     }
