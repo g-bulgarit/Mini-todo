@@ -8,6 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tasks::{Task, TaskStatus};
 use tui::backend::CrosstermBackend;
+use tui::layout::Alignment;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
@@ -189,11 +190,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            let textbox = Paragraph::new(app.current_message.as_ref()).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Double),
-            );
+            let textbox = match app.app_state {
+                AppState::Manage => Paragraph::new("Use arrow keys to move around, <i> to go to edit mode, <del> to delete a task and <q> to quit.").block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Plain),
+                ).alignment(Alignment::Center),
+
+                AppState::Edit => {
+                    Paragraph::new(app.current_message.as_ref()).block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_type(BorderType::Plain),
+                    )
+                },
+            };
 
             match app.app_state {
                 AppState::Edit => {
@@ -274,6 +285,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     backlog_items.remove(selected_idx);
                                     app.backlog_size -= 1;
                                 }
+                                if app.current_selection_idx != 0 {
+                                    app.current_selection_idx -= 1;
+                                }
                             }
                         }
                         ActiveSection::InProgress => {
@@ -282,6 +296,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     in_progress_items.remove(selected_idx);
                                     app.inprogress_size -= 1;
                                 }
+                                if app.current_selection_idx != 0 {
+                                    app.current_selection_idx -= 1;
+                                }
                             }
                         }
                         ActiveSection::Done => {
@@ -289,6 +306,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 if done_items.len() != 0 {
                                     done_items.remove(selected_idx);
                                     app.done_size -= 1;
+                                }
+                                if app.current_selection_idx != 0 {
+                                    app.current_selection_idx -= 1;
                                 }
                             }
                         }
