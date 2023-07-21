@@ -6,7 +6,7 @@ use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tasks::{by_name, Task, TaskStatus};
+use tasks::{Task, TaskStatus};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
@@ -103,18 +103,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     let mut colptr: usize = 0;
 
-    let mut tasks: Vec<Task> = Vec::new();
-    let mut backlog_items: Vec<ListItem> = Vec::new();
-    let mut in_progress_items: Vec<ListItem> = Vec::new();
-    let mut done_items: Vec<ListItem> = Vec::new();
-
-    update(
-        &mut app,
-        &tasks,
-        &mut backlog_items,
-        &mut in_progress_items,
-        &mut done_items,
-    );
+    let mut backlog_items: Vec<Task> = Vec::new();
+    let mut in_progress_items: Vec<Task> = Vec::new();
+    let mut done_items: Vec<Task> = Vec::new();
 
     loop {
         // Scroll to current column
@@ -144,7 +135,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .vertical_margin(0)
                 .split(chunks[0]);
 
-            let backlog = List::new(backlog_items.as_ref())
+            let backlog_listitems: Vec<ListItem<'_>> = backlog_items
+                .iter()
+                .map(|item| ListItem::new(item.text.to_string()))
+                .collect();
+            let backlog = List::new(backlog_listitems.as_ref())
                 .block(
                     Block::default()
                         .title(" Backlog ")
@@ -158,7 +153,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-            let inprogress = List::new(in_progress_items.as_ref())
+            let inprogress_listitems: Vec<ListItem<'_>> = in_progress_items
+                .iter()
+                .map(|item| ListItem::new(item.text.to_string()))
+                .collect();
+            let inprogress = List::new(inprogress_listitems.as_ref())
                 .block(
                     Block::default()
                         .title(" In Progress ")
@@ -172,8 +171,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
 
-
-            let done = List::new(done_items.as_ref())
+            let done_listitems: Vec<ListItem<'_>> = done_items
+                .iter()
+                .map(|item| ListItem::new(item.text.to_string()))
+                .collect();
+            let done = List::new(done_listitems.as_ref())
                 .block(
                     Block::default()
                         .title(" Done ")
@@ -206,9 +208,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AppState::Manage => match app.active_selection {
                     ActiveSection::Backlog => {
                         app.backlog_state.select(Some(app.current_selection_idx));
-
-                    },
-                    ActiveSection::InProgress => app.inprogress_state.select(Some(app.current_selection_idx)),
+                    }
+                    ActiveSection::InProgress => {
+                        app.inprogress_state.select(Some(app.current_selection_idx))
+                    }
                     ActiveSection::Done => app.done_state.select(Some(app.current_selection_idx)),
                 },
             }
@@ -282,15 +285,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     KeyCode::Enter => {
                         let msg_text = app.current_message.drain(..).collect();
-                        let new_task: Task = Task::create_new_task(msg_text, TaskStatus::Backlog);
-                        tasks.push(new_task);
-                        update(
-                            &mut app,
-                            &tasks,
-                            &mut backlog_items,
-                            &mut in_progress_items,
-                            &mut done_items,
-                        );
+                        match app.active_selection {
+                            ActiveSection::Backlog => backlog_items
+                                .push(Task::create_new_task(msg_text, TaskStatus::Backlog)),
+                            ActiveSection::InProgress => in_progress_items
+                                .push(Task::create_new_task(msg_text, TaskStatus::InProgress)),
+                            ActiveSection::Done => {
+                                done_items.push(Task::create_new_task(msg_text, TaskStatus::Done))
+                            }
+                        }
                     }
                     _ => {}
                 },
@@ -298,39 +301,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Tick => {}
             },
         };
-    }
-}
-
-fn update(
-    app: &mut App,
-    tasks: &Vec<Task>,
-    backlog_items: &mut Vec<ListItem>,
-    in_progress_items: &mut Vec<ListItem>,
-    done_items: &mut Vec<ListItem>,
-) {
-    backlog_items.clear();
-    app.backlog_size = 0;
-
-    in_progress_items.clear();
-    app.inprogress_size = 0;
-
-    done_items.clear();
-    app.done_size = 0;
-
-    for task in tasks {
-        match task.get_status() {
-            TaskStatus::Backlog => {
-                backlog_items.push(task.to_list_item());
-                app.backlog_size += 1;
-            }
-            TaskStatus::InProgress => {
-                in_progress_items.push(task.to_list_item());
-                app.inprogress_size += 1;
-            }
-            TaskStatus::Done => {
-                done_items.push(task.to_list_item());
-                app.done_size += 1;
-            }
-        }
     }
 }
