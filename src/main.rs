@@ -267,21 +267,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('i') => {
                         app.app_state = AppState::Edit;
                     }
-                    KeyCode::Delete => {
-                        match app.active_selection {
-                            ActiveSection::Backlog => {
-                                if let Some(selected_idx) = app.backlog_state.selected() {
+                    KeyCode::Delete => match app.active_selection {
+                        ActiveSection::Backlog => {
+                            if let Some(selected_idx) = app.backlog_state.selected() {
+                                if backlog_items.len() != 0 {
                                     backlog_items.remove(selected_idx);
                                     app.backlog_size -= 1;
-                                    if app.current_selection_idx != 0 {
-                                        app.current_selection_idx -= 1;
-                                    }
                                 }
-                            },
-                            ActiveSection::InProgress => todo!(),
-                            ActiveSection::Done => todo!(),
+                            }
                         }
-                    }
+                        ActiveSection::InProgress => {
+                            if let Some(selected_idx) = app.inprogress_state.selected() {
+                                if in_progress_items.len() != 0 {
+                                    in_progress_items.remove(selected_idx);
+                                    app.inprogress_size -= 1;
+                                }
+                            }
+                        }
+                        ActiveSection::Done => {
+                            if let Some(selected_idx) = app.done_state.selected() {
+                                if done_items.len() != 0 {
+                                    done_items.remove(selected_idx);
+                                    app.done_size -= 1;
+                                }
+                            }
+                        }
+                    },
                     _ => {}
                 },
 
