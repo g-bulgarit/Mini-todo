@@ -28,3 +28,11 @@ impl Task {
     }
 } 
 
+pub fn by_name(name: String, tasks: Vec<Task>) -> Result<Task, u8> {
+    for task in tasks {
+        if task.text == name {
+            return Ok(task);
+        }
+    }
+    return Err(0)
+}

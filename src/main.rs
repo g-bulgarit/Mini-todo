@@ -6,11 +6,11 @@ use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tasks::{Task, TaskStatus};
+use tasks::{by_name, Task, TaskStatus};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, ListState};
+use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
 use tui::Terminal;
 
 enum Event<I> {
@@ -37,6 +37,9 @@ struct App {
     done_size: usize,
     current_message: String,
     current_selection_idx: usize,
+    backlog_state: ListState,
+    inprogress_state: ListState,
+    done_state: ListState,
 }
 
 impl Default for App {
@@ -49,6 +52,9 @@ impl Default for App {
             backlog_size: 0,
             inprogress_size: 0,
             done_size: 0,
+            backlog_state: ListState::default(),
+            inprogress_state: ListState::default(),
+            done_state: ListState::default(),
         }
     }
 }
@@ -151,11 +157,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
-            let mut backlog_state = ListState::default();
-            backlog_state.select(Some(app.current_selection_idx));
-            
+
             let inprogress = List::new(in_progress_items.as_ref())
-            .block(
+                .block(
                     Block::default()
                         .title(" In Progress ")
                         .borders(Borders::ALL)
@@ -163,12 +167,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ActiveSection::InProgress => BorderType::Double,
                             _ => BorderType::Plain,
                         }),
-                    )
+                )
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
-            let mut inprogress_state = ListState::default();
-            
+
+
             let done = List::new(done_items.as_ref())
                 .block(
                     Block::default()
@@ -182,30 +186,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .highlight_style(Style::default())
                 .highlight_symbol(">>")
                 .style(Style::default().fg(Color::White));
-            let mut done_state = ListState::default();
 
             let textbox = Paragraph::new(app.current_message.as_ref()).block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_type(BorderType::Double),
-                );
-                
+            );
+
             match app.app_state {
-                    AppState::Edit => {
+                AppState::Edit => {
                     canvas.set_cursor(
                         // Put cursor past the end of the input text
                         chunks[1].x + app.current_message.len() as u16 + 1,
                         // Move one line down, from the border to the input line
                         chunks[1].y + 1,
                     )
+                }
+
+                AppState::Manage => match app.active_selection {
+                    ActiveSection::Backlog => {
+                        app.backlog_state.select(Some(app.current_selection_idx));
+
+                    },
+                    ActiveSection::InProgress => app.inprogress_state.select(Some(app.current_selection_idx)),
+                    ActiveSection::Done => app.done_state.select(Some(app.current_selection_idx)),
                 },
-                
-                AppState::Manage => {}
             }
 
-            canvas.render_stateful_widget(backlog, body_chunks[0], &mut backlog_state);
-            canvas.render_stateful_widget(inprogress, body_chunks[1], &mut inprogress_state);
-            canvas.render_stateful_widget(done, body_chunks[2], &mut done_state);
+            canvas.render_stateful_widget(backlog, body_chunks[0], &mut app.backlog_state);
+            canvas.render_stateful_widget(inprogress, body_chunks[1], &mut app.inprogress_state);
+            canvas.render_stateful_widget(done, body_chunks[2], &mut app.done_state);
             canvas.render_widget(textbox, chunks[1]);
         })?;
 
@@ -251,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     KeyCode::Char('i') => {
                         app.app_state = AppState::Edit;
-                    },
+                    }
                     _ => {}
                 },
 
@@ -274,7 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let msg_text = app.current_message.drain(..).collect();
                         let new_task: Task = Task::create_new_task(msg_text, TaskStatus::Backlog);
                         tasks.push(new_task);
-                        update(&mut app, &tasks, &mut backlog_items, &mut in_progress_items, &mut done_items);
+                        update(
+                            &mut app,
+                            &tasks,
+                            &mut backlog_items,
+                            &mut in_progress_items,
+                            &mut done_items,
+                        );
                     }
                     _ => {}
                 },
@@ -306,7 +322,7 @@ fn update(
             TaskStatus::Backlog => {
                 backlog_items.push(task.to_list_item());
                 app.backlog_size += 1;
-            },
+            }
             TaskStatus::InProgress => {
                 in_progress_items.push(task.to_list_item());
                 app.inprogress_size += 1;
