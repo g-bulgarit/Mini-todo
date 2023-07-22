@@ -1,5 +1,5 @@
 mod tasks;
-use tasks::{save_tasks_to_file, read_tasks_from_file, Task, TaskStatus};
+use tasks::{read_tasks_from_file, save_tasks_to_file, Task, TaskStatus};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             backlog_items = Vec::new();
             in_progress_items = Vec::new();
             done_items = Vec::new();
-        },
+        }
     };
 
     app.backlog_size = backlog_items.len();
