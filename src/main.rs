@@ -1,5 +1,5 @@
 mod tasks;
-use tasks::{save_tasks_to_file, Task, TaskStatus};
+use tasks::{save_tasks_to_file, read_tasks_from_file, Task, TaskStatus};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -84,9 +84,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     let mut colptr: usize = 0;
 
-    let mut backlog_items: Vec<Task> = Vec::new();
-    let mut in_progress_items: Vec<Task> = Vec::new();
-    let mut done_items: Vec<Task> = Vec::new();
+    let mut backlog_items: Vec<Task>;
+    let mut in_progress_items: Vec<Task>;
+    let mut done_items: Vec<Task>;
+
+    // backlog_items = Vec::new();
+    // in_progress_items = Vec::new();
+    // done_items = Vec::new();
+
+    // (backlog_items, in_progress_items, done_items) = read_tasks_from_file().unwrap();
+
+    let _ = match read_tasks_from_file() {
+        Ok(vectors) => (backlog_items, in_progress_items, done_items) = vectors,
+        Err(_) => {
+            backlog_items = Vec::new();
+            in_progress_items = Vec::new();
+            done_items = Vec::new();
+        },
+    };
 
     loop {
         // Scroll to current column
