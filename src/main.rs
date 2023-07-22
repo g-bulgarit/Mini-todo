@@ -240,7 +240,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // On quit, disable the terminal and give back control.
                         save_tasks_to_file(backlog_items, in_progress_items, done_items);
                         disable_raw_mode()?;
-                        // terminal.clear()?;
+                        terminal.clear()?;
                         terminal.show_cursor()?;
                         return Ok(());
                     }
