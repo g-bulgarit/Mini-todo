@@ -88,12 +88,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut in_progress_items: Vec<Task>;
     let mut done_items: Vec<Task>;
 
-    // backlog_items = Vec::new();
-    // in_progress_items = Vec::new();
-    // done_items = Vec::new();
-
-    // (backlog_items, in_progress_items, done_items) = read_tasks_from_file().unwrap();
-
     let _ = match read_tasks_from_file() {
         Ok(vectors) => (backlog_items, in_progress_items, done_items) = vectors,
         Err(_) => {
