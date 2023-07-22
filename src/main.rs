@@ -1,5 +1,5 @@
 mod tasks;
-use tasks::{Task, TaskStatus};
+use tasks::{Task, TaskStatus, all_tasks_to_json};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -159,7 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .style(match app.active_selection {
                     ActiveSection::InProgress => Style::default().fg(Color::Cyan),
                     _ => Style::default()
-                }
+                    }
                 );
 
             let done_listitems: Vec<ListItem<'_>> = done_items
@@ -178,14 +178,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .highlight_style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
                 .highlight_symbol("-> ")
-                .style(match app.active_selection {
-                    ActiveSection::Done => Style::default().fg(Color::Cyan),
-                    _ => Style::default()
-                }
+                .style(
+                    match app.active_selection {
+                        ActiveSection::Done => Style::default().fg(Color::Cyan),
+                        _ => Style::default()
+                    }
                 );
 
             let textbox = match app.app_state {
-                AppState::Manage => Paragraph::new("<i> to go to edit mode, <j, k> to move task, <del> to delete a task and <q> to quit.")
+                AppState::Manage => Paragraph::new("<i> to insert, <j, k> to move task, <del> to delete a task and <q> to quit.")
                 .block(Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Plain),)
@@ -237,8 +238,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Input(event) => match event.code {
                     KeyCode::Char('q') => {
                         // On quit, disable the terminal and give back control.
+                        let str = all_tasks_to_json(backlog_items, in_progress_items, done_items);
+                        println!("{:?}", str);
                         disable_raw_mode()?;
-                        terminal.clear()?;
+                        // terminal.clear()?;
                         terminal.show_cursor()?;
                         return Ok(());
                     }
