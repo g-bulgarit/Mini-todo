@@ -103,6 +103,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
+    app.backlog_size = backlog_items.len();
+    app.inprogress_size = in_progress_items.len();
+    app.done_size = done_items.len();
+
     loop {
         // Scroll to current column
         app.active_selection = columns[colptr];
