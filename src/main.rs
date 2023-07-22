@@ -1,5 +1,5 @@
 mod tasks;
-use tasks::{Task, TaskStatus, all_tasks_to_json};
+use tasks::{Task, TaskStatus, save_tasks_to_file};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -238,8 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Input(event) => match event.code {
                     KeyCode::Char('q') => {
                         // On quit, disable the terminal and give back control.
-                        let str = all_tasks_to_json(backlog_items, in_progress_items, done_items);
-                        println!("{:?}", str);
+                        save_tasks_to_file(backlog_items, in_progress_items, done_items);
                         disable_raw_mode()?;
                         // terminal.clear()?;
                         terminal.show_cursor()?;
