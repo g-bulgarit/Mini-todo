@@ -1,5 +1,8 @@
 mod tasks;
+mod ui;
+
 use tasks::{read_tasks_from_file, save_tasks_to_file, Task, TaskStatus};
+use ui::{generate_stateful_textbox, generate_task_box, ActiveSection, App, AppState};
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -7,55 +10,13 @@ use std::io;
 use std::sync::mpsc;
 use std::thread;
 use tui::backend::CrosstermBackend;
-use tui::layout::Alignment;
 use tui::layout::{Constraint, Direction, Layout};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
+
+use tui::widgets::ListItem;
 use tui::Terminal;
 
 enum Event<I> {
     Input(I),
-}
-#[derive(Clone, Copy)]
-enum ActiveSection {
-    Backlog,
-    InProgress,
-    Done,
-}
-
-enum AppState {
-    Manage,
-    Edit,
-}
-
-struct App {
-    app_state: AppState,
-    active_selection: ActiveSection,
-    backlog_size: usize,
-    inprogress_size: usize,
-    done_size: usize,
-    current_message: String,
-    current_selection_idx: usize,
-    backlog_state: ListState,
-    inprogress_state: ListState,
-    done_state: ListState,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        App {
-            app_state: AppState::Manage,
-            active_selection: ActiveSection::Backlog,
-            current_message: String::new(),
-            current_selection_idx: 0,
-            backlog_size: 0,
-            inprogress_size: 0,
-            done_size: 0,
-            backlog_state: ListState::default(),
-            inprogress_state: ListState::default(),
-            done_state: ListState::default(),
-        }
-    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -133,94 +94,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .map(|item| ListItem::new(item.text.to_string()))
                 .collect();
-            let backlog = List::new(backlog_listitems.as_ref())
-                .block(
-                    Block::default()
-                        .title(" Backlog ")
-                        .borders(Borders::ALL)
-                        .border_type(match app.active_selection {
-                            ActiveSection::Backlog => BorderType::Double,
-                            _ => BorderType::Plain,
-                        }),
-                )
-                .highlight_style(
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol("-> ")
-                .style(match app.active_selection {
-                    ActiveSection::Backlog => Style::default().fg(Color::Cyan),
-                    _ => Style::default(),
-                });
 
             let inprogress_listitems: Vec<ListItem<'_>> = in_progress_items
                 .iter()
                 .map(|item| ListItem::new(item.text.to_string()))
                 .collect();
-            let inprogress = List::new(inprogress_listitems.as_ref())
-                .block(
-                    Block::default()
-                        .title(" In Progress ")
-                        .borders(Borders::ALL)
-                        .border_type(match app.active_selection {
-                            ActiveSection::InProgress => BorderType::Double,
-                            _ => BorderType::Plain,
-                        }),
-                )
-                .highlight_style(
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol("-> ")
-                .style(match app.active_selection {
-                    ActiveSection::InProgress => Style::default().fg(Color::Cyan),
-                    _ => Style::default(),
-                });
 
             let done_listitems: Vec<ListItem<'_>> = done_items
                 .iter()
                 .map(|item| ListItem::new(item.text.to_string()))
                 .collect();
-            let done = List::new(done_listitems.as_ref())
-                .block(
-                    Block::default()
-                        .title(" Done ")
-                        .borders(Borders::ALL)
-                        .border_type(match app.active_selection {
-                            ActiveSection::Done => BorderType::Double,
-                            _ => BorderType::Plain,
-                        }),
-                )
-                .highlight_style(
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol("-> ")
-                .style(match app.active_selection {
-                    ActiveSection::Done => Style::default().fg(Color::Cyan),
-                    _ => Style::default(),
-                });
 
-            let textbox = match app.app_state {
-                AppState::Manage => Paragraph::new(
-                    "<i> to insert, <j, k> to move task, <del> to delete a task and <q> to quit.",
-                )
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Plain),
-                )
-                .alignment(Alignment::Center),
-
-                AppState::Edit => Paragraph::new(app.current_message.as_ref()).block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Plain),
-                ),
-            };
+            let backlog = generate_task_box(&app, backlog_listitems, ActiveSection::Backlog, "Backlog".to_string());
+            let inprogress =
+                generate_task_box(&app, inprogress_listitems, ActiveSection::InProgress,"In Progress".to_string());
+            let done = generate_task_box(&app, done_listitems, ActiveSection::Done, "Done".to_string());
+            let textbox = generate_stateful_textbox(&app);
 
             match app.app_state {
                 AppState::Edit => {
